@@ -3,6 +3,7 @@ module PrecessionNutation
 using AstronomicalTime
 using ERFA
 using StaticArrays
+using MuladdMacro
 
 import EarthOrientation: precession_nutation00
 
@@ -21,44 +22,31 @@ end
 function precession_nutation_IAU2006_IAU2000A_R06(ep_tt::TTEpoch; revision = 0)
     tt_jc = jc(ep_tt)
 
-    X_p, Y_p, s_p = precession_nutation_IAU2006_IAU2000A_R06_polynomial(tt_jc, revision = revision)
-    X_h, Y_h, s_h = precession_nutation_IAU2006_IAU2000A_R06_harmonic(tt_jc)
-
-    X_p + X_h, Y_p + Y_h, s_p + s_h
-end
-
-function precession_nutation_IAU2006_IAU2000A_R06_polynomial(tt_jc; revision = 0)
-
     if revision === 0
         # P03
-        X = μas_to_rad( @evalpoly(tt_jc, -16_617.0, +2_004_191_898.00,    -429_782.90, -198_618.34,     +7.578,  +5.928_5) ) # μas
-        Y = μas_to_rad( @evalpoly(tt_jc,  -6_951.0,        -25_896.00, -22_407_274.70,   +1_900.59, +1_112.526,  +0.135_8) ) # μas
-        s = μas_to_rad( @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) ) # μas
+        X = @evalpoly(tt_jc, -16_617.0, +2_004_191_898.00,    -429_782.90, -198_618.34,     +7.578,  +5.928_5) # μas
+        Y = @evalpoly(tt_jc,  -6_951.0,        -25_896.00, -22_407_274.70,   +1_900.59, +1_112.526,  +0.135_8) # μas
+        s = @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) # μas
 
     elseif revision === 1
         # P03_rev1
-        X = μas_to_rad( @evalpoly(tt_jc, -16_617.0, +2_004_191_804.00,    -429_755.80, -198_618.29,     +7.575,  +5.928_5) ) # μas
-        Y = μas_to_rad( @evalpoly(tt_jc,  -6_951.0,        -24_867.00, -22_407_272.70,   +1_900.26, +1_112.525,  +0.135_8) ) # μas
+        X = @evalpoly(tt_jc, -16_617.0, +2_004_191_804.00,    -429_755.80, -198_618.29,     +7.575,  +5.928_5) # μas
+        Y = @evalpoly(tt_jc,  -6_951.0,        -24_867.00, -22_407_272.70,   +1_900.26, +1_112.525,  +0.135_8) # μas
 
         # TODO: confirm values for s
-        s = μas_to_rad( @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) ) # μas
+        s = @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) # μas
 
     elseif revision === 2
         # P03_rev2
-        X = μas_to_rad( @evalpoly(tt_jc, -16_617.0, +2_004_192_130.00,    -429_775.20, -198_618.39,     +7.576,  +5.928_5) ) # μas
-        Y = μas_to_rad( @evalpoly(tt_jc,  -6_951.0,        -25_817.00, -22_407_280.10,   +1_900.46, +1_112.526,  +0.135_8) ) # μas
+        X = @evalpoly(tt_jc, -16_617.0, +2_004_192_130.00,    -429_775.20, -198_618.39,     +7.576,  +5.928_5) # μas
+        Y = @evalpoly(tt_jc,  -6_951.0,        -25_817.00, -22_407_280.10,   +1_900.46, +1_112.526,  +0.135_8) # μas
 
         # TODO: confirm values for s
-        s = μas_to_rad( @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) ) # μas
+        s = @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) # μas
 
     else
         error("Revision $revision not implemented")
     end
-
-    X, Y, s - X * Y / 2
-end
-
-function precession_nutation_IAU2006_IAU2000A_R06_harmonic(tt_jc)
 
     fund_args = fundamental_arguments(tt_jc)
 
@@ -70,22 +58,13 @@ function precession_nutation_IAU2006_IAU2000A_R06_harmonic(tt_jc)
 
         arg = 0.0
         @inbounds @simd for k in frequency.coefficients_idx
-            arg += frequency.coefficients[k] * fund_args[k]
+            @muladd arg += frequency.coefficients[k] * fund_args[k]
         end
         si = sin(arg)
         co = cos(arg)
 
         @inbounds for component in frequency.components
-
-            # ampl = if component.czero
-            #     component.s * si
-            # elseif component.szero
-            #     component.c * co
-            # else
-            #     component.s * si + component.c * co
-            # end
-
-            ampl = ifelse(component.czero, component.s * si, ifelse(component.szero, component.c * co, component.s * si + component.c * co))
+            @muladd ampl = component.s * si + component.c * co
 
             if component.variable == 1
                 X_harm_coeff[component.poweridx] += ampl
@@ -97,9 +76,13 @@ function precession_nutation_IAU2006_IAU2000A_R06_harmonic(tt_jc)
         end
     end
 
-    X = μas_to_rad( @evalpoly(tt_jc, X_harm_coeff[1], X_harm_coeff[2], X_harm_coeff[3], X_harm_coeff[4], X_harm_coeff[5]) )
-    Y = μas_to_rad( @evalpoly(tt_jc, Y_harm_coeff[1], Y_harm_coeff[2], Y_harm_coeff[3], Y_harm_coeff[4], Y_harm_coeff[5]) )
-    s = μas_to_rad( @evalpoly(tt_jc, s_harm_coeff[1], s_harm_coeff[2], s_harm_coeff[3], s_harm_coeff[4], s_harm_coeff[5]) )
+    X += @evalpoly(tt_jc, X_harm_coeff[1], X_harm_coeff[2], X_harm_coeff[3], X_harm_coeff[4], X_harm_coeff[5])
+    Y += @evalpoly(tt_jc, Y_harm_coeff[1], Y_harm_coeff[2], Y_harm_coeff[3], Y_harm_coeff[4], Y_harm_coeff[5])
+    s += @evalpoly(tt_jc, s_harm_coeff[1], s_harm_coeff[2], s_harm_coeff[3], s_harm_coeff[4], s_harm_coeff[5])
+
+    X = μas_to_rad(X)
+    Y = μas_to_rad(Y)
+    s = μas_to_rad(s)
 
     X, Y, s - X * Y / 2
 end

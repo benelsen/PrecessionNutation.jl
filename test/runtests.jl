@@ -24,7 +24,6 @@ const TENTH_MICROARCSEC = deg2rad(0.1 / 3600e6)
 
                 @printf "Differences in Year %4d: \n" year
                 @printf "       PN.jl -      ERFA =      Diff | Rel. Err. | <= 0.1 μas \n"
-                @printf "x:  1.91e-03 -  1.91e-03 =  2.17e-19 |     0.000 | true \n"
                 @printf "X: %9.2e - %9.2e = %9.2e | %9.3f | %s \n" x x_erfa (x-x_erfa) (x-x_erfa)/x_erfa norm(x-x_erfa) <= TENTH_MICROARCSEC
                 @printf "Y: %9.2e - %9.2e = %9.2e | %9.3f | %s \n" y y_erfa (y-y_erfa) (y-y_erfa)/y_erfa norm(y-y_erfa) <= TENTH_MICROARCSEC
                 @printf "s: %9.2e - %9.2e = %9.2e | %9.3f | %s \n" s s_erfa (s-s_erfa) (s-s_erfa)/s_erfa norm(s-s_erfa) <= TENTH_MICROARCSEC
