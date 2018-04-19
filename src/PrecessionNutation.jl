@@ -9,7 +9,7 @@ import EarthOrientation: precession_nutation00
 include("helper.jl")
 include("tables.jl")
 
-export precession_nutation_erfa, precession_nutation_00
+export precession_nutation_erfa, precession_nutation_06
 
 function precession_nutation_erfa(ep::TTEpoch)
     x, y = ERFA.xy06(julian1(ep), julian2(ep))
@@ -18,8 +18,47 @@ function precession_nutation_erfa(ep::TTEpoch)
 end
 
 ### IAU 2006 precession and IAU 2000A_R06 nutation
-function precession_nutation_00(ep_tt::TTEpoch)
+function precession_nutation_IAU2006_IAU2000A_R06(ep_tt::TTEpoch; revision = 0)
     tt_jc = jc(ep_tt)
+
+    X_p, Y_p, s_p = precession_nutation_IAU2006_IAU2000A_R06_polynomial(tt_jc, revision = revision)
+    X_h, Y_h, s_h = precession_nutation_IAU2006_IAU2000A_R06_harmonic(tt_jc)
+
+    X_p + X_h, Y_p + Y_h, s_p + s_h
+end
+
+function precession_nutation_IAU2006_IAU2000A_R06_polynomial(tt_jc; revision = 0)
+
+    if revision === 0
+        # P03
+        X = μas_to_rad( @evalpoly(tt_jc, -16_617.0, +2_004_191_898.00,    -429_782.90, -198_618.34,     +7.578,  +5.928_5) ) # μas
+        Y = μas_to_rad( @evalpoly(tt_jc,  -6_951.0,        -25_896.00, -22_407_274.70,   +1_900.59, +1_112.526,  +0.135_8) ) # μas
+        s = μas_to_rad( @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) ) # μas
+
+    elseif revision === 1
+        # P03_rev1
+        X = μas_to_rad( @evalpoly(tt_jc, -16_617.0, +2_004_191_804.00,    -429_755.80, -198_618.29,     +7.575,  +5.928_5) ) # μas
+        Y = μas_to_rad( @evalpoly(tt_jc,  -6_951.0,        -24_867.00, -22_407_272.70,   +1_900.26, +1_112.525,  +0.135_8) ) # μas
+
+        # TODO: confirm values for s
+        s = μas_to_rad( @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) ) # μas
+
+    elseif revision === 2
+        # P03_rev2
+        X = μas_to_rad( @evalpoly(tt_jc, -16_617.0, +2_004_192_130.00,    -429_775.20, -198_618.39,     +7.576,  +5.928_5) ) # μas
+        Y = μas_to_rad( @evalpoly(tt_jc,  -6_951.0,        -25_817.00, -22_407_280.10,   +1_900.46, +1_112.526,  +0.135_8) ) # μas
+
+        # TODO: confirm values for s
+        s = μas_to_rad( @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) ) # μas
+
+    else
+        error("Revision $revision not implemented")
+    end
+
+    X, Y, s - X * Y / 2
+end
+
+function precession_nutation_IAU2006_IAU2000A_R06_harmonic(tt_jc)
 
     fund_args = fundamental_arguments(tt_jc)
 
@@ -58,29 +97,13 @@ function precession_nutation_00(ep_tt::TTEpoch)
         end
     end
 
-    X = μas_to_rad( @evalpoly(tt_jc, -16_617.0, +2_004_191_898.00,    -429_782.90, -198_618.34,     +7.578,  +5.928_5) +
-                    @evalpoly(tt_jc, X_harm_coeff[1], X_harm_coeff[2], X_harm_coeff[3], X_harm_coeff[4], X_harm_coeff[5]) )
+    X = μas_to_rad( @evalpoly(tt_jc, X_harm_coeff[1], X_harm_coeff[2], X_harm_coeff[3], X_harm_coeff[4], X_harm_coeff[5]) )
+    Y = μas_to_rad( @evalpoly(tt_jc, Y_harm_coeff[1], Y_harm_coeff[2], Y_harm_coeff[3], Y_harm_coeff[4], Y_harm_coeff[5]) )
+    s = μas_to_rad( @evalpoly(tt_jc, s_harm_coeff[1], s_harm_coeff[2], s_harm_coeff[3], s_harm_coeff[4], s_harm_coeff[5]) )
 
-    Y = μas_to_rad( @evalpoly(tt_jc,  -6_951.0,        -25_896.00, -22_407_274.70,   +1_900.59, +1_112.526,  +0.135_8) +
-                    @evalpoly(tt_jc, Y_harm_coeff[1], Y_harm_coeff[2], Y_harm_coeff[3], Y_harm_coeff[4], Y_harm_coeff[5]) )
-
-    s = μas_to_rad( @evalpoly(tt_jc,     +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0) +
-                    @evalpoly(tt_jc, s_harm_coeff[1], s_harm_coeff[2], s_harm_coeff[3], s_harm_coeff[4], s_harm_coeff[5]) )
-
-    return X, Y, s - X * Y / 2
+    X, Y, s - X * Y / 2
 end
 
+const precession_nutation_06 = precession_nutation_IAU2006_IAU2000A_R06
+
 end # module
-
-# P03
-# X_poly_coeff = @SVector [-16_617.0, +2_004_191_898.00,    -429_782.90, -198_618.34,     +7.578,  +5.928_5] # μas
-# Y_poly_coeff = @SVector [ -6_951.0,        -25_896.00, -22_407_274.70,   +1_900.59, +1_112.526,  +0.135_8] # μas
-# s_poly_coeff = @SVector [    +94.0,         +3_808.65,        -122.68,  -72_574.11,    +27.980, +15.620_0] # μas
-
-# P03_rev1
-# X_poly_coeff = @MVector [-16_617.0, +2_004_191_804.00,    -429_755.80, -198_618.29,     +7.575,  +5.928_5] # μas
-# Y_poly_coeff = @MVector [ -6_951.0,        -24_867.00, -22_407_272.70,   +1_900.26, +1_112.525,  +0.135_8] # μas
-
-# P03_rev2
-# X_poly_coeff = @MVector [-16_617.0, +2_004_192_130.00,    -429_775.20, -198_618.39,     +7.576,  +5.928_5] # μas
-# Y_poly_coeff = @MVector [ -6_951.0,        -25_817.00, -22_407_280.10,   +1_900.46, +1_112.526,  +0.135_8] # μas
